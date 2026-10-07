@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.6</title>
+  <title>GEOSLUX 3D Production Viewer v0.6.1</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -52,7 +52,7 @@
     </header>
 
     <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра">
-<strong>GEOSLUX Viewer <small>v0.6</small></strong>
+<strong>GEOSLUX Viewer <small>v0.6.1</small></strong>
 <button data-action="fit">◎ <span>В центр модели<small>Вписать весь проект в экран</small></span></button>
 <button data-action="parts">▦ <span>Список деталей<small>Размеры, материалы, количество</small></span></button>
 <button data-action="panels">◉ <span>Панели<small id="menuPanelsState">Показаны · нажмите, чтобы скрыть</small></span></button>
@@ -70,7 +70,7 @@
 <g data-view="front" tabindex="0" role="button" aria-label="Вид спереди"><polygon points="5,28 50,51 50,103 5,80"/><text x="27" y="67" text-anchor="middle" transform="rotate(27 27 67)">ФРОНТ</text></g>
 <g data-view="right" tabindex="0" role="button" aria-label="Вид справа"><polygon points="50,51 95,28 95,80 50,103"/><text x="74" y="67" text-anchor="middle" transform="rotate(-27 74 67)">ПРАВО</text></g></svg></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6.1</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -140,7 +140,19 @@ function init(){if(!window.THREE){err('Для 3D нужен интернет п�
  renderer.domElement.addEventListener('pointerup',pick);window.addEventListener('resize',resize);resize();loop();loadEmbedded();
 }
 function resize(){if(!renderer)return;const r=ui.mount.getBoundingClientRect();renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);camera.aspect=Math.max(1,r.width)/Math.max(1,r.height);camera.updateProjectionMatrix()}
-function loop(){requestAnimationFrame(loop);controls&&controls.update();renderer&&renderer.render(scene,camera)}
+const selectionMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+let selectionPulseStart=0;
+function updateSelectionPulse(now){
+ if(!selectedSpec||!outlineRoot||!outlineRoot.visible)return;
+ const phase=selectionMotion.matches?0:(1-Math.cos((now-selectionPulseStart)*Math.PI*2/2400))/2;
+ for(const object of outlineRoot.children){
+  const material=object.material;
+  if(material&&material.userData.selectionPulse){
+   material.color.copy(material.userData.pulseBase).lerp(material.userData.pulseLight,phase);
+  }
+ }
+}
+function loop(now=performance.now()){requestAnimationFrame(loop);controls&&controls.update();updateSelectionPulse(now);renderer&&renderer.render(scene,camera)}
 function clearGroup(g){while(g.children.length){const o=g.children.pop();o.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material){(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>m.dispose&&m.dispose())}})}}
 function resetScene(){clearGroup(modelRoot);clearGroup(holeRoot);clearGroup(proxyRoot);clearGroup(outlineRoot);clearGroup(contextRoot);holeMeshes.length=0;materialRegistry.length=0;proxyByCode.clear();selectedSpec=null;ui.sheet.classList.add('hidden')}
 function parseXML(t){const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw Error('XML не прочитан');const out=[];[...d.querySelectorAll('Объект')].forEach(n=>{if(text(n,'ТипОбъекта')!=='Панель')return;const holes=[...n.querySelectorAll(':scope > Отверстия > Отверстие')].map(h=>({x:num(h,'ПозицияX'),y:num(h,'ПозицияY'),z:num(h,'ПозицияZ'),diameter:num(h,'Диаметр'),depth:num(h,'Глубина'),dx:num(h,'НаправлениеX'),dy:num(h,'НаправлениеY'),dz:num(h,'НаправлениеZ'),type:text(h,'Тип')}));const mat=n.querySelector(':scope > ОсновнойМатериал > Наименование');out.push({code:norm(text(n,'КодДетали')||text(n,'Позиция')),name:text(n,'Наименование'),length:num(n,'Длина'),width:num(n,'Ширина'),thickness:num(n,'ОбщаяТолщина'),qty:num(n,'Количество')||1,material:mat?mat.textContent.trim():'',edges:[1,2,3,4].flatMap(side=>[...n.querySelectorAll(':scope > СписокКромок'+side+' > Кромка')].map(e=>'Сторона '+side+': '+text(e,'Наименование')+' · '+num(e,'Толщина')+' мм')),holes:holes.length,holeData:holes})});specs=out;specByCode=new Map(out.map(s=>[s.code,s]));renderParts();return d}
@@ -189,6 +201,7 @@ function selectionGeometryForProxy(p){
  return g;
 }
 function highlight(ps){
+ selectionPulseStart=performance.now();
  clearGroup(outlineRoot);
  let any=false;
  ps.forEach(p=>{
@@ -196,6 +209,7 @@ function highlight(ps){
   if(geo.attributes.position&&geo.attributes.position.count){
    any=true;
    const mat=new THREE.MeshStandardMaterial({color:0x20b95f,roughness:.42,metalness:.01,transparent:true,opacity:.98,side:THREE.DoubleSide,depthTest:false,depthWrite:false});
+   mat.userData.selectionPulse=true;mat.userData.pulseBase=mat.color.clone();mat.userData.pulseLight=mat.color.clone().setHex(0x3bc974);
    const m=new THREE.Mesh(geo,mat);m.renderOrder=999;outlineRoot.add(m);
    const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo,18),new THREE.LineBasicMaterial({color:0x087532,transparent:true,opacity:1,depthTest:false}));
    edges.renderOrder=1000;outlineRoot.add(edges);
