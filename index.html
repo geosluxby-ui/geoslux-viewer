@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.6.1</title>
+  <title>GEOSLUX 3D Production Viewer v0.6.2</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -31,6 +31,20 @@
 .viewer-menu{position:absolute;z-index:35;right:12px;top:74px;width:min(330px,calc(100vw - 24px));background:rgba(255,255,255,.98);border:1px solid #cde3d5;border-radius:18px;box-shadow:0 16px 45px #24392b26;overflow:hidden;padding:8px 0}.viewer-menu>strong{display:block;padding:10px 16px;color:#166b3e}.viewer-menu>strong small{float:right;color:#7a8d80;font-size:11px}.viewer-menu button{display:flex;gap:14px;align-items:center;border:0;border-top:1px solid #e4eee7;background:transparent;color:#19834c;padding:11px 16px;width:100%;text-align:left;font-size:20px}.viewer-menu button span{color:#25392d;font-size:14px}.viewer-menu button small{display:block;font-size:11px;color:#718176;margin-top:3px}.viewer-menu button:hover{background:#eaf8f0}
 .drilling-view{position:absolute;z-index:45;inset:0;display:grid;grid-template-columns:1fr min(360px,32vw);background:linear-gradient(#dbeef5,#e6ebed)}.drilling-canvas{display:flex;align-items:center;justify-content:center;overflow:auto}.drilling-canvas svg{width:100%;height:100%;min-height:260px}.drilling-info{background:#fcfefd;padding:16px;display:flex;flex-direction:column;gap:16px;overflow:auto}.drilling-info strong{font-size:13px}.drill-tools{display:flex;gap:8px}.drill-tools button{border:1px solid #bbd8c6;border-radius:9px;background:#eff9f3;padding:8px 14px;color:#137e49}.drilling-info .primary{margin-top:auto;flex-shrink:0}#drillDetails{font-size:13px;color:#5a6e61;line-height:1.6}#drillDetails table{width:100%;border-collapse:collapse;font-size:11px}#drillDetails td,#drillDetails th{padding:5px;border-bottom:1px solid #dde9e1;text-align:left}
 @media(max-width:700px){.drilling-view{grid-template-columns:1fr;grid-template-rows:minmax(260px,55%) 1fr}.drilling-info{padding:12px;gap:8px}}
+
+.bottom-sheet{left:16px;right:auto;bottom:18px;width:350px;max-width:calc(100vw - 32px);margin:0;max-height:calc(100dvh - 115px);overflow:auto;border-radius:16px;padding:12px}
+.bottom-sheet .grab{display:none}.sheet-head>div{min-width:0;align-items:flex-start}.sheet-head strong{font-size:14px;overflow-wrap:anywhere}.sheet-head .close{flex-shrink:0;width:32px;height:32px;font-size:20px}.sheet-grid{gap:6px}.sheet-actions{gap:6px}.sheet-actions button{font-size:12px;padding:0 9px}
+.view-cube{width:124px;height:142px;right:18px;top:94px;filter:none;user-select:none;-webkit-user-select:none}
+.view-cube svg{overflow:visible;filter:drop-shadow(0 8px 7px rgba(39,59,48,.20))}
+.view-cube [data-view]{stroke:none;fill:none;outline:none}
+.view-cube .cube-plane{stroke:#a5b6be;stroke-width:.9;stroke-linejoin:round;fill:var(--face-fill);transition:fill .16s,stroke .16s}
+.view-cube text{fill:#455e69;opacity:.5;font-size:9px;font-weight:650;pointer-events:none;stroke:none}
+.view-cube [data-view]:hover,.view-cube [data-view]:focus{fill:none}
+.view-cube [data-view]:hover .cube-plane,.view-cube [data-view]:focus .cube-plane{fill:#c2eed5;stroke:#159957;stroke-width:1.5}
+.view-cube [data-view].selected .cube-plane{fill:#82d5a8;stroke:#12884e}
+.view-cube [data-view]:hover text,.view-cube [data-view]:focus text,.view-cube [data-view].selected text{opacity:.9}
+.cube-hint{display:block;text-align:center;font-size:10px;color:#60786a;opacity:.65;margin-top:-4px;pointer-events:none}
+@media(max-width:600px){.bottom-sheet{left:8px;bottom:10px;width:280px;max-width:calc(100vw - 65px);max-height:38dvh;padding:9px}.sheet-grid .stat{padding:6px}.sheet-grid .stat b{font-size:11px}.sheet-actions button{min-height:35px;font-size:11px}.view-cube{right:8px;top:84px;width:100px;height:115px}}
 </style>
 </head>
 <body>
@@ -52,7 +66,7 @@
     </header>
 
     <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра">
-<strong>GEOSLUX Viewer <small>v0.6.1</small></strong>
+<strong>GEOSLUX Viewer <small>v0.6.2</small></strong>
 <button data-action="fit">◎ <span>В центр модели<small>Вписать весь проект в экран</small></span></button>
 <button data-action="parts">▦ <span>Список деталей<small>Размеры, материалы, количество</small></span></button>
 <button data-action="panels">◉ <span>Панели<small id="menuPanelsState">Показаны · нажмите, чтобы скрыть</small></span></button>
@@ -65,12 +79,9 @@
       <div id="loading" class="loading">Загрузка точной модели…</div>
       <div id="viewerError" class="viewer-error hidden"></div>
 
-      <div class="view-cube" aria-label="Стандартные виды"><svg viewBox="0 0 100 110" role="img" aria-label="Куб навигации">
-<g data-view="top" tabindex="0" role="button" aria-label="Вид сверху"><polygon points="50,5 95,28 50,51 5,28"/><text x="50" y="31" text-anchor="middle">ВЕРХ</text></g>
-<g data-view="front" tabindex="0" role="button" aria-label="Вид спереди"><polygon points="5,28 50,51 50,103 5,80"/><text x="27" y="67" text-anchor="middle" transform="rotate(27 27 67)">ФРОНТ</text></g>
-<g data-view="right" tabindex="0" role="button" aria-label="Вид справа"><polygon points="50,51 95,28 95,80 50,103"/><text x="74" y="67" text-anchor="middle" transform="rotate(-27 74 67)">ПРАВО</text></g></svg></div>
+      <div class="view-cube" aria-label="Стандартные виды"><svg id="navigationCube" viewBox="0 0 140 150" aria-label="Куб навигации"></svg><span id="cubeHint" class="cube-hint">Виды</span></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6.1</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6.2</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -131,7 +142,7 @@ function err(m){ui.error.textContent=m;ui.error.classList.remove('hidden')}
 function clearErr(){ui.error.classList.add('hidden')}
 function init(){if(!window.THREE){err('Для 3D нужен интернет при первом открытии: не загрузилась библиотека Three.js.');return}
  scene=new THREE.Scene();scene.background=new THREE.Color(0xe7eff4);
- camera=new THREE.PerspectiveCamera(36,1,0.1,20000);camera.up.set(0,1,0);
+ camera=new THREE.PerspectiveCamera(36,1,0.1,20000);camera.up.set(0,1,0);camera.position.set(.9,.65,-1.05);camera.lookAt(0,0,0);updateNavigationCube();
  try{renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true})}catch(e){ui.loading.classList.add('hidden');parseXML(ungzipB64(window.GEOSLUX_XML_GZ));err('В этом браузере недоступен WebGL. Откройте 3D в Chrome/Edge с аппаратным ускорением. Список деталей и 2D-присадка доступны.');return}renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputEncoding=THREE.sRGBEncoding;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;ui.mount.appendChild(renderer.domElement);
  controls=new THREE.OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.075;controls.screenSpacePanning=true;controls.minDistance=100;controls.maxDistance=7000;
  raycaster=new THREE.Raycaster();pointer=new THREE.Vector2();
@@ -152,7 +163,7 @@ function updateSelectionPulse(now){
   }
  }
 }
-function loop(now=performance.now()){requestAnimationFrame(loop);controls&&controls.update();updateSelectionPulse(now);renderer&&renderer.render(scene,camera)}
+function loop(now=performance.now()){requestAnimationFrame(loop);controls&&controls.update();updateNavigationCube();updateSelectionPulse(now);renderer&&renderer.render(scene,camera)}
 function clearGroup(g){while(g.children.length){const o=g.children.pop();o.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material){(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>m.dispose&&m.dispose())}})}}
 function resetScene(){clearGroup(modelRoot);clearGroup(holeRoot);clearGroup(proxyRoot);clearGroup(outlineRoot);clearGroup(contextRoot);holeMeshes.length=0;materialRegistry.length=0;proxyByCode.clear();selectedSpec=null;ui.sheet.classList.add('hidden')}
 function parseXML(t){const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw Error('XML не прочитан');const out=[];[...d.querySelectorAll('Объект')].forEach(n=>{if(text(n,'ТипОбъекта')!=='Панель')return;const holes=[...n.querySelectorAll(':scope > Отверстия > Отверстие')].map(h=>({x:num(h,'ПозицияX'),y:num(h,'ПозицияY'),z:num(h,'ПозицияZ'),diameter:num(h,'Диаметр'),depth:num(h,'Глубина'),dx:num(h,'НаправлениеX'),dy:num(h,'НаправлениеY'),dz:num(h,'НаправлениеZ'),type:text(h,'Тип')}));const mat=n.querySelector(':scope > ОсновнойМатериал > Наименование');out.push({code:norm(text(n,'КодДетали')||text(n,'Позиция')),name:text(n,'Наименование'),length:num(n,'Длина'),width:num(n,'Ширина'),thickness:num(n,'ОбщаяТолщина'),qty:num(n,'Количество')||1,material:mat?mat.textContent.trim():'',edges:[1,2,3,4].flatMap(side=>[...n.querySelectorAll(':scope > СписокКромок'+side+' > Кромка')].map(e=>'Сторона '+side+': '+text(e,'Наименование')+' · '+num(e,'Толщина')+' мм')),holes:holes.length,holeData:holes})});specs=out;specByCode=new Map(out.map(s=>[s.code,s]));renderParts();return d}
@@ -178,7 +189,26 @@ function loadEmbedded(){try{ui.loading.classList.remove('hidden');resetScene();p
 function applyVisibility(){materialRegistry.forEach(m=>{const hidden=m.userData.hardware?hiddenHardware:hiddenPanels;m.visible=!hidden&&!selectedSpec;m.wireframe=false;m.transparent=false;m.opacity=1;m.depthWrite=true;m.needsUpdate=true});contextRoot.children.forEach(o=>o.visible=!(o.userData.hardware?hiddenHardware:hiddenPanels));$('#menuPanelsState').textContent=hiddenPanels?'Скрыты · нажмите, чтобы показать':'Показаны · нажмите, чтобы скрыть';$('#menuHardwareState').textContent=hiddenHardware?'Скрыта · отверстия сохраняются':'Показана · отверстия сохраняются';$('#menuHolesState').textContent=holesVisible?'Показаны · присадка из XML':'Скрыты · нажмите, чтобы показать';holeRoot.visible=holesVisible;outlineRoot.visible=!hiddenPanels;$('#btnPanels').classList.toggle('active',hiddenPanels);$('#btnPanels').title=hiddenPanels?'Показать панели':'Скрыть панели';$('#btnHardware').classList.toggle('active',hiddenHardware);$('#btnHardware').title=hiddenHardware?'Показать фурнитуру':'Скрыть фурнитуру';$('#btnHoles').classList.toggle('active',holesVisible);['btnPanels','btnHardware','btnHoles'].forEach(id=>$('#'+id).setAttribute('aria-pressed',$('#'+id).classList.contains('active')))}
 function bbox(){return new THREE.Box3().setFromObject(modelRoot)}
 function fit(){camera.up.set(0,1,0);const b=bbox();if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=Math.max(s.x,s.y,s.z)*1.75;camera.position.set(c.x+d*.9,c.y+d*.65,c.z-d*1.05);controls.target.copy(c);camera.near=Math.max(.1,d/1000);camera.far=d*15;camera.updateProjectionMatrix();controls.update()}
-function view(v){const b=bbox(),c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=Math.max(s.x,s.y,s.z)*2;if(v==='top'){camera.up.set(0,0,-1);camera.position.set(c.x,c.y+d,c.z)}if(v==='front'){camera.up.set(0,1,0);camera.position.set(c.x,c.y,c.z-d)}if(v==='right'){camera.up.set(0,1,0);camera.position.set(c.x+d,c.y,c.z)}controls.target.copy(c);camera.lookAt(c);controls.update()}
+function view(v){if(!controls||!modelRoot)return;const b=bbox(),c=b.getCenter(new THREE.Vector3()),size=b.getSize(new THREE.Vector3()),d=Math.max(size.x,size.y,size.z)*2;const directions={top:[0,1,0],bottom:[0,-1,0],front:[0,0,-1],back:[0,0,1],right:[1,0,0],left:[-1,0,0]};if(!directions[v])return;camera.up.set(0,1,0);if(v==='top')camera.up.set(0,0,1);if(v==='bottom')camera.up.set(0,0,-1);camera.position.copy(c).add(new THREE.Vector3(...directions[v]).multiplyScalar(d));controls.target.copy(c);camera.lookAt(c);controls.update();updateNavigationCube()}
+const cubeFaces=[
+ {id:'front',label:'ФРОНТ',normal:[0,0,-1],points:[[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1]],fill:'#f5f9fb'},
+ {id:'back',label:'СЗАДИ',normal:[0,0,1],points:[[-1,1,1],[1,1,1],[1,-1,1],[-1,-1,1]],fill:'#e3edf2'},
+ {id:'right',label:'ПРАВО',normal:[1,0,0],points:[[1,1,-1],[1,1,1],[1,-1,1],[1,-1,-1]],fill:'#dce7ee'},
+ {id:'left',label:'ЛЕВО',normal:[-1,0,0],points:[[-1,1,1],[-1,1,-1],[-1,-1,-1],[-1,-1,1]],fill:'#e8f0f5'},
+ {id:'top',label:'ВЕРХ',normal:[0,1,0],points:[[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]],fill:'#ffffff'},
+ {id:'bottom',label:'НИЗ',normal:[0,-1,0],points:[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]],fill:'#d4e1e8'}
+];
+let cubeRotationKey='';
+function updateNavigationCube(){
+ if(!camera||!window.THREE)return;
+ const inverse=camera.quaternion.clone().invert(),key=inverse.toArray().map(n=>n.toFixed(5)).join(',');
+ if(key===cubeRotationKey)return;cubeRotationKey=key;
+ const project=p=>{const v=new THREE.Vector3(...p).applyQuaternion(inverse);return {x:70+v.x*33,y:68-v.y*33,z:v.z}};
+ const faces=cubeFaces.map(f=>({...f,n:new THREE.Vector3(...f.normal).applyQuaternion(inverse),p:f.points.map(project)})).filter(f=>f.n.z>.001).sort((a,b)=>a.n.z-b.n.z);
+ $('#navigationCube').innerHTML=faces.map(f=>{const p=f.p,selected=f.n.z>.9995;
+ const ax=(p[1].x-p[0].x)/60,ay=(p[1].y-p[0].y)/60,bx=(p[3].x-p[0].x)/60,by=(p[3].y-p[0].y)/60;
+ return '<g data-view="'+f.id+'" role="button" tabindex="0" aria-label="'+f.label+'" aria-pressed="'+selected+'" class="'+(selected?'selected':'')+'" style="--face-fill:'+f.fill+'"><polygon class="cube-plane" points="'+p.map(v=>v.x+','+v.y).join(' ')+'"/><text transform="matrix('+[ax,ay,bx,by,p[0].x,p[0].y].join(' ')+')" x="30" y="32" text-anchor="middle">'+f.label+'</text></g>'}).join('');
+}
 function pick(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(pointer,camera);if(hiddenPanels)return;const hits=raycaster.intersectObjects(proxyRoot.children,false);if(hits.length){const p=hits[0].object;showSpec(specByCode.get(p.userData.code),p.userData.name);highlight([p])}}
 function showSpec(s,label){if(!s)return;selectedSpec=s;ui.sheetCode.textContent=s.code;ui.sheetName.textContent=label||s.name;ui.sheetStats.innerHTML=[['Размер',`${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм`],['Количество',`${s.qty} шт.`],['Материал',s.material||'—'],['Отверстия',`${s.holes||0}`]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join('');ui.sheet.classList.remove('hidden')}
 function renderParts(){$('#projectSummary').textContent=`${specs.length} позиций · ${specs.reduce((n,s)=>n+s.qty,0)} панелей · ${specs.reduce((n,s)=>n+s.holes*s.qty,0)} отверстий. Выберите деталь: зелёное выделение, остальные — контуры. Размеры в мм.`;const q=(ui.partSearch.value||'').toLowerCase();ui.partList.innerHTML='';specs.filter(s=>(s.code+' '+s.name+' '+s.material).toLowerCase().includes(q)).forEach(s=>{const b=document.createElement('button');b.type='button';b.className='part-row';b.innerHTML=`<span class="part-code">${esc(s.code)}</span><span><b>${esc(s.name)}</b><span>${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм · ${s.qty} шт.</span></span>`;b.addEventListener('click',()=>{showSpec(s);ui.parts.classList.add('hidden');focusCode(s.code)});ui.partList.appendChild(b)})}
@@ -225,7 +255,7 @@ function fmt(n){return Number.isFinite(+n)?(+n).toLocaleString('ru-RU',{maximumF
 $('#btnParts').addEventListener('click',()=>ui.parts.classList.toggle('hidden'));$('#closeParts').addEventListener('click',()=>ui.parts.classList.add('hidden'));ui.partSearch.addEventListener('input',renderParts);$('#btnFit').addEventListener('click',fit);$('#btnHome').addEventListener('click',resetSelection);
 $('#btnPanels').addEventListener('click',()=>{hiddenPanels=!hiddenPanels;applyVisibility();ui.status.textContent=hiddenPanels?'Панели скрыты · фурнитура и отверстия управляются отдельно':'Панели показаны'});$('#btnHardware').addEventListener('click',()=>{hiddenHardware=!hiddenHardware;applyVisibility();ui.status.textContent=hiddenHardware?'Фурнитура скрыта · отверстия сохранены':'Фурнитура показана'});$('#btnHoles').addEventListener('click',()=>{holesVisible=!holesVisible;applyVisibility()});$('#btnExplode').addEventListener('click',()=>{ui.status.textContent='Exploded view появится после экспорта scene.json из БАЗИС';setTimeout(()=>ui.status.textContent='Шкаф под вытяжку · точная OBJ-модель',2200)});
 $('#btnFiles').addEventListener('click',()=>ui.files.classList.remove('hidden'));$('#closeFiles').addEventListener('click',()=>ui.files.classList.add('hidden'));$('#btnHelp').addEventListener('click',()=>ui.help.classList.remove('hidden'));$('#closeHelp').addEventListener('click',()=>ui.help.classList.add('hidden'));$('#closeSheet').addEventListener('click',()=>ui.sheet.classList.add('hidden'));$('#btnResetSelection').addEventListener('click',resetSelection);$('#btnFocusPart').addEventListener('click',()=>selectedSpec&&focusCode(selectedSpec.code));
-ui.fileInput.addEventListener('change',e=>{pendingFiles=[...e.target.files];ui.fileState.textContent=pendingFiles.map(f=>f.name).join(' · ');ui.process.disabled=!pendingFiles.length});ui.process.addEventListener('click',loadFiles);[...document.querySelectorAll('[data-view]')].forEach(b=>b.addEventListener('click',()=>view(b.dataset.view)));
+ui.fileInput.addEventListener('change',e=>{pendingFiles=[...e.target.files];ui.fileState.textContent=pendingFiles.map(f=>f.name).join(' · ');ui.process.disabled=!pendingFiles.length});ui.process.addEventListener('click',loadFiles);$('#navigationCube').addEventListener('click',e=>{const face=e.target.closest('[data-view]');if(face)view(face.dataset.view)});$('#navigationCube').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const face=e.target.closest('[data-view]');if(face){e.preventDefault();view(face.dataset.view)}}});$('#navigationCube').addEventListener('pointerover',e=>{const face=e.target.closest('[data-view]');$('#cubeHint').textContent=face?face.getAttribute('aria-label'):'Виды'});$('#navigationCube').addEventListener('pointerleave',()=>$('#cubeHint').textContent='Виды');
 $('#btnMenu').addEventListener('click',()=>$('#viewerMenu').classList.toggle('hidden'));$('#viewerMenu').addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;const ids={fit:'btnFit',parts:'btnParts',panels:'btnPanels',hardware:'btnHardware',holes:'btnHoles',help:'btnHelp'};if(ids[button.dataset.action])$('#'+ids[button.dataset.action]).click();$('#viewerMenu').classList.add('hidden')});document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-label',b.title||b.textContent.trim()));
 
 let drillZoom=1;
