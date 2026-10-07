@@ -132,7 +132,7 @@ function clearErr(){ui.error.classList.add('hidden')}
 function init(){if(!window.THREE){err('Для 3D нужен интернет при первом открытии: не загрузилась библиотека Three.js.');return}
  scene=new THREE.Scene();scene.background=new THREE.Color(0xe7eff4);
  camera=new THREE.PerspectiveCamera(36,1,0.1,20000);camera.up.set(0,1,0);
- renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputEncoding=THREE.sRGBEncoding;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;ui.mount.appendChild(renderer.domElement);
+ try{renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true})}catch(e){ui.loading.classList.add('hidden');parseXML(ungzipB64(window.GEOSLUX_XML_GZ));err('В этом браузере недоступен WebGL. Откройте 3D в Chrome/Edge с аппаратным ускорением. Список деталей и 2D-присадка доступны.');return}renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputEncoding=THREE.sRGBEncoding;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;ui.mount.appendChild(renderer.domElement);
  controls=new THREE.OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.075;controls.screenSpacePanning=true;controls.minDistance=100;controls.maxDistance=7000;
  raycaster=new THREE.Raycaster();pointer=new THREE.Vector2();
  scene.add(new THREE.HemisphereLight(0xffffff,0x75838d,1.25));const key=new THREE.DirectionalLight(0xffffff,.85);key.position.set(1200,1800,1600);key.castShadow=true;scene.add(key);const fill=new THREE.DirectionalLight(0xffffff,.35);fill.position.set(-1000,900,-1200);scene.add(fill);
