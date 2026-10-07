@@ -193,10 +193,10 @@ function view(v){if(!controls||!modelRoot)return;const b=bbox(),c=b.getCenter(ne
 const cubeFaces=[
  {id:'front',label:'ФРОНТ',normal:[0,0,-1],points:[[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1]],fill:'#f5f9fb'},
  {id:'back',label:'СЗАДИ',normal:[0,0,1],points:[[-1,1,1],[1,1,1],[1,-1,1],[-1,-1,1]],fill:'#e3edf2'},
- {id:'right',label:'ПРАВО',normal:[1,0,0],points:[[1,1,-1],[1,1,1],[1,-1,1],[1,-1,-1]],fill:'#dce7ee'},
- {id:'left',label:'ЛЕВО',normal:[-1,0,0],points:[[-1,1,1],[-1,1,-1],[-1,-1,-1],[-1,-1,1]],fill:'#e8f0f5'},
- {id:'top',label:'ВЕРХ',normal:[0,1,0],points:[[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]],fill:'#ffffff'},
- {id:'bottom',label:'НИЗ',normal:[0,-1,0],points:[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]],fill:'#d4e1e8'}
+ {id:'right',label:'ПРАВО',normal:[1,0,0],points:[[1,1,1],[1,1,-1],[1,-1,-1],[1,-1,1]],fill:'#dce7ee'},
+ {id:'left',label:'ЛЕВО',normal:[-1,0,0],points:[[-1,1,-1],[-1,1,1],[-1,-1,1],[-1,-1,-1]],fill:'#e8f0f5'},
+ {id:'top',label:'ВЕРХ',normal:[0,1,0],points:[[1,1,1],[-1,1,1],[-1,1,-1],[1,1,-1]],fill:'#ffffff'},
+ {id:'bottom',label:'НИЗ',normal:[0,-1,0],points:[[1,-1,-1],[-1,-1,-1],[-1,-1,1],[1,-1,1]],fill:'#d4e1e8'}
 ];
 let cubeRotationKey='';
 function updateNavigationCube(){
