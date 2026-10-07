@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.6.2</title>
+  <title>GEOSLUX 3D Production Viewer v0.6.3</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -66,11 +66,11 @@
     </header>
 
     <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра">
-<strong>GEOSLUX Viewer <small>v0.6.2</small></strong>
+<strong>GEOSLUX Viewer <small>v0.6.3</small></strong>
 <button data-action="fit">◎ <span>В центр модели<small>Вписать весь проект в экран</small></span></button>
 <button data-action="parts">▦ <span>Список деталей<small>Размеры, материалы, количество</small></span></button>
 <button data-action="panels">◉ <span>Панели<small id="menuPanelsState">Показаны · нажмите, чтобы скрыть</small></span></button>
-<button data-action="hardware">⚙ <span>Фурнитура<small id="menuHardwareState">Показана · отверстия сохраняются</small></span></button>
+<button id="btnRestoreParts" disabled>↶ <span>Показать скрытые детали<small>Вернуть панели в модель</small></span></button><button data-action="hardware">⚙ <span>Фурнитура<small id="menuHardwareState">Показана · отверстия сохраняются</small></span></button>
 <button data-action="holes">⊙ <span>Отверстия<small id="menuHolesState">Показаны · присадка из XML</small></span></button>
 <button id="btnFiles">↥ <span>Загрузить проект<small>Выберите OBJ и XML</small></span></button>
 <button data-action="help">? <span>Управление<small>Вращение, масштаб, выбор детали</small></span></button></nav>
@@ -81,7 +81,7 @@
 
       <div class="view-cube" aria-label="Стандартные виды"><svg id="navigationCube" viewBox="0 0 140 150" aria-label="Куб навигации"></svg><span id="cubeHint" class="cube-hint">Виды</span></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6.2</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.6.3</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -117,7 +117,7 @@
         <div class="help-grid">
           <div><b>Телефон</b><span>1 палец — вращение<br>2 пальца — масштаб и панорама</span></div>
           <div><b>Компьютер</b><span>ЛКМ — вращение<br>колесо — масштаб<br>ПКМ — панорама</span></div>
-          <div><b>Глаз · Панели</b><span>Скрыть или показать все панели. Фурнитура и отверстия переключаются отдельно.</span></div><div><b>Крепёж · Фурнитура</b><span>Скрывает стальные планки, петли и пластиковые элементы. Корпус и отверстия остаются.</span></div>
+          <div><b>Глаз · Панели</b><span>Сначала выберите деталь, затем нажмите глаз: скроется только она. Вернуть детали можно через меню «Показать скрытые детали».</span></div><div><b>Крепёж · Фурнитура</b><span>Скрывает стальные планки, петли и пластиковые элементы. Корпус и отверстия остаются.</span></div>
           <div><b>◉ Отверстия</b><span>Показывает присадку из XML поверх точной OBJ-модели.</span></div>
         </div>
       </div>
@@ -137,6 +137,7 @@ const ui={mount:$('#threeMount'),loading:$('#loading'),error:$('#viewerError'),s
 let scene,camera,renderer,controls,raycaster,pointer,modelRoot,holeRoot,proxyRoot,outlineRoot,contextRoot,shadowPlane;
 let specs=[],specByCode=new Map(),pendingFiles=[];let hiddenPanels=false,hiddenHardware=false,holesVisible=true,selectedSpec=null;
 const hardwareRE=/сталь|пластик|планка.*завес|петл|завес|винт|болт|шуруп|креп|blum|camar|inoxa/i;
+let selectedProxies=[];const hiddenPartIds=new Set();
 const holeMeshes=[];const materialRegistry=[];const proxyByCode=new Map();
 function err(m){ui.error.textContent=m;ui.error.classList.remove('hidden')}
 function clearErr(){ui.error.classList.add('hidden')}
@@ -165,7 +166,7 @@ function updateSelectionPulse(now){
 }
 function loop(now=performance.now()){requestAnimationFrame(loop);controls&&controls.update();updateNavigationCube();updateSelectionPulse(now);renderer&&renderer.render(scene,camera)}
 function clearGroup(g){while(g.children.length){const o=g.children.pop();o.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material){(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>m.dispose&&m.dispose())}})}}
-function resetScene(){clearGroup(modelRoot);clearGroup(holeRoot);clearGroup(proxyRoot);clearGroup(outlineRoot);clearGroup(contextRoot);holeMeshes.length=0;materialRegistry.length=0;proxyByCode.clear();selectedSpec=null;ui.sheet.classList.add('hidden')}
+function resetScene(){selectedProxies=[];hiddenPartIds.clear();modelRoot.traverse(o=>{if(o.userData.fullGeometry)o.userData.fullGeometry.dispose()});clearGroup(modelRoot);clearGroup(holeRoot);clearGroup(proxyRoot);clearGroup(outlineRoot);clearGroup(contextRoot);holeMeshes.length=0;materialRegistry.length=0;proxyByCode.clear();selectedSpec=null;ui.sheet.classList.add('hidden')}
 function parseXML(t){const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw Error('XML не прочитан');const out=[];[...d.querySelectorAll('Объект')].forEach(n=>{if(text(n,'ТипОбъекта')!=='Панель')return;const holes=[...n.querySelectorAll(':scope > Отверстия > Отверстие')].map(h=>({x:num(h,'ПозицияX'),y:num(h,'ПозицияY'),z:num(h,'ПозицияZ'),diameter:num(h,'Диаметр'),depth:num(h,'Глубина'),dx:num(h,'НаправлениеX'),dy:num(h,'НаправлениеY'),dz:num(h,'НаправлениеZ'),type:text(h,'Тип')}));const mat=n.querySelector(':scope > ОсновнойМатериал > Наименование');out.push({code:norm(text(n,'КодДетали')||text(n,'Позиция')),name:text(n,'Наименование'),length:num(n,'Длина'),width:num(n,'Ширина'),thickness:num(n,'ОбщаяТолщина'),qty:num(n,'Количество')||1,material:mat?mat.textContent.trim():'',edges:[1,2,3,4].flatMap(side=>[...n.querySelectorAll(':scope > СписокКромок'+side+' > Кромка')].map(e=>'Сторона '+side+': '+text(e,'Наименование')+' · '+num(e,'Толщина')+' мм')),holes:holes.length,holeData:holes})});specs=out;specByCode=new Map(out.map(s=>[s.code,s]));renderParts();return d}
 function text(n,t){const e=n.querySelector(':scope > '+t);return e?e.textContent.trim():''}function num(n,t){const v=parseFloat(text(n,t));return Number.isFinite(v)?v:0}function norm(v){const n=parseInt(String(v||'').trim(),10);return Number.isFinite(n)?String(n).padStart(3,'0'):String(v||'').trim()}
 function colorFor(name){const l=(name||'').toLowerCase();if(l.includes('u999')||l.includes('чёр')||l.includes('черн'))return 0x2f3031;if(l.includes('лдсп 10'))return 0xe8e7e2;if(l.includes('керамогранит'))return 0xf4f3ee;if(l.includes('бронз'))return 0x8b745c;if(l.includes('abs'))return 0x3d3d3d;if(l.includes('пластик бел'))return 0xf1f2f2;if(l.includes('пластик крас'))return 0xb73c34;if(l.includes('сталь')||l.includes('планка'))return 0x76818a;return 0xb4aaa0}
@@ -186,7 +187,56 @@ function addProxy(code,name,pos,size){const geo=new THREE.BoxGeometry(size.x,siz
 function addHole(pos,d,depth){const r=Math.max(2,d/2);const geo=new THREE.CylinderGeometry(r,r,Math.max(1.2,Math.min(depth,4)),28,1,false);const mat=new THREE.MeshStandardMaterial({color:0x202427,roughness:.55,metalness:.08});const m=new THREE.Mesh(geo,mat);m.position.copy(pos);m.rotation.z=Math.PI/2*0;holeRoot.add(m);holeMeshes.push(m);const ring=new THREE.Mesh(new THREE.TorusGeometry(r,1.1,8,28),new THREE.MeshBasicMaterial({color:0x111416}));ring.rotation.x=Math.PI/2;ring.position.set(pos.x,pos.y+2.2,pos.z);holeRoot.add(ring);holeMeshes.push(ring)}
 function ungzipB64(b64){const bin=atob(b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder('utf-8').decode(pako.ungzip(u))}
 function loadEmbedded(){try{ui.loading.classList.remove('hidden');resetScene();parseXML(ungzipB64(window.GEOSLUX_XML_GZ));parseOBJ(ungzipB64(window.GEOSLUX_OBJ_GZ));createProxiesAndHoles();applyVisibility();fit();ui.status.textContent='Шкаф под вытяжку · точная OBJ-модель · вращайте пальцем';}catch(e){err('Ошибка модели: '+e.message)}finally{ui.loading.classList.add('hidden')}}
-function applyVisibility(){materialRegistry.forEach(m=>{const hidden=m.userData.hardware?hiddenHardware:hiddenPanels;m.visible=!hidden&&!selectedSpec;m.wireframe=false;m.transparent=false;m.opacity=1;m.depthWrite=true;m.needsUpdate=true});contextRoot.children.forEach(o=>o.visible=!(o.userData.hardware?hiddenHardware:hiddenPanels));$('#menuPanelsState').textContent=hiddenPanels?'Скрыты · нажмите, чтобы показать':'Показаны · нажмите, чтобы скрыть';$('#menuHardwareState').textContent=hiddenHardware?'Скрыта · отверстия сохраняются':'Показана · отверстия сохраняются';$('#menuHolesState').textContent=holesVisible?'Показаны · присадка из XML':'Скрыты · нажмите, чтобы показать';holeRoot.visible=holesVisible;outlineRoot.visible=!hiddenPanels;$('#btnPanels').classList.toggle('active',hiddenPanels);$('#btnPanels').title=hiddenPanels?'Показать панели':'Скрыть панели';$('#btnHardware').classList.toggle('active',hiddenHardware);$('#btnHardware').title=hiddenHardware?'Показать фурнитуру':'Скрыть фурнитуру';$('#btnHoles').classList.toggle('active',holesVisible);['btnPanels','btnHardware','btnHoles'].forEach(id=>$('#'+id).setAttribute('aria-pressed',$('#'+id).classList.contains('active')))}
+function applyVisibility(){materialRegistry.forEach(m=>{const hidden=m.userData.hardware?hiddenHardware:hiddenPanels;m.visible=!hidden&&!selectedSpec;m.wireframe=false;m.transparent=false;m.opacity=1;m.depthWrite=true;m.needsUpdate=true});contextRoot.children.forEach(o=>o.visible=!(o.userData.hardware?hiddenHardware:hiddenPanels));$('#menuPanelsState').textContent=selectedProxies.length?'Скрыть только выбранную деталь':'Сначала выберите деталь';$('#btnRestoreParts').disabled=!hiddenPartIds.size;$('#menuHardwareState').textContent=hiddenHardware?'Скрыта · отверстия сохраняются':'Показана · отверстия сохраняются';$('#menuHolesState').textContent=holesVisible?'Показаны · присадка из XML':'Скрыты · нажмите, чтобы показать';holeRoot.visible=holesVisible;outlineRoot.visible=!hiddenPanels;$('#btnPanels').classList.toggle('active',false);$('#btnPanels').title='Скрыть выбранную деталь';$('#btnPanels').setAttribute('aria-label','Скрыть выбранную деталь');$('#btnHardware').classList.toggle('active',hiddenHardware);$('#btnHardware').title=hiddenHardware?'Показать фурнитуру':'Скрыть фурнитуру';$('#btnHoles').classList.toggle('active',holesVisible);['btnPanels','btnHardware','btnHoles'].forEach(id=>$('#'+id).setAttribute('aria-pressed',$('#'+id).classList.contains('active')))}
+function rebuildPartVisibility(){
+ if(!modelRoot)return;
+ const boxes=proxyRoot.children.filter(p=>hiddenPartIds.has(p.uuid)).map(p=>new THREE.Box3().setFromObject(p).expandByScalar(.15));
+ modelRoot.updateMatrixWorld(true);
+ modelRoot.traverse(o=>{
+  if(!o.isMesh)return;
+  if(!o.userData.fullGeometry)o.userData.fullGeometry=o.geometry.clone();
+  const source=o.userData.fullGeometry,geo=source.clone(),pos=source.attributes.position,index=source.index;
+  const mats=Array.isArray(o.material)?o.material:[o.material];
+  const groups=source.groups.length?source.groups:[{start:0,count:index?index.count:pos.count,materialIndex:0}];
+  const indices=[];geo.clearGroups();
+  const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),center=new THREE.Vector3();
+  groups.forEach(group=>{
+   const start=indices.length,hardware=!!mats[group.materialIndex]?.userData.hardware;
+   for(let i=group.start;i+2<group.start+group.count;i+=3){
+    const ids=[0,1,2].map(offset=>index?index.getX(i+offset):i+offset);
+    a.fromBufferAttribute(pos,ids[0]);b.fromBufferAttribute(pos,ids[1]);c.fromBufferAttribute(pos,ids[2]);
+    center.copy(a).add(b).add(c).multiplyScalar(1/3).applyMatrix4(o.matrixWorld);
+    if(!hardware&&boxes.some(box=>box.containsPoint(center)))continue;
+    indices.push(...ids);
+   }
+   geo.addGroup(start,indices.length-start,group.materialIndex||0);
+  });
+  geo.setIndex(indices);o.geometry.dispose();o.geometry=geo;
+ });
+ clearGroup(contextRoot);
+ modelRoot.traverse(o=>{
+  if(!o.isMesh)return;const geo=o.geometry,pos=geo.attributes.position,index=geo.index,mats=Array.isArray(o.material)?o.material:[o.material];
+  geo.groups.forEach(group=>{
+   if(!group.count)return;const vertices=[];
+   for(let i=group.start;i<group.start+group.count;i++){const v=new THREE.Vector3().fromBufferAttribute(pos,index.getX(i)).applyMatrix4(o.matrixWorld);vertices.push(v.x,v.y,v.z)}
+   const part=new THREE.BufferGeometry();part.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+   const edge=new THREE.LineSegments(new THREE.EdgesGeometry(part,40),new THREE.LineBasicMaterial({color:0x536c60,transparent:true,opacity:.34}));
+   edge.userData.hardware=!!mats[group.materialIndex]?.userData.hardware;contextRoot.add(edge);part.dispose();
+  });
+ });
+}
+function hideSelectedPart(){
+ if(!selectedProxies.length){ui.status.textContent='Сначала выберите деталь, которую нужно скрыть';return}
+ selectedProxies.forEach(p=>hiddenPartIds.add(p.uuid));
+ selectedProxies=[];selectedSpec=null;hiddenPanels=false;
+ clearGroup(outlineRoot);rebuildPartVisibility();applyVisibility();ui.sheet.classList.add('hidden');
+ ui.status.textContent='Выбранная деталь скрыта · остальные элементы сохранены';
+}
+function restoreHiddenParts(){
+ hiddenPartIds.clear();selectedProxies=[];selectedSpec=null;hiddenPanels=false;
+ if(outlineRoot)clearGroup(outlineRoot);rebuildPartVisibility();applyVisibility();ui.sheet.classList.add('hidden');
+ ui.status.textContent='Скрытые детали снова показаны';
+}
 function bbox(){return new THREE.Box3().setFromObject(modelRoot)}
 function fit(){camera.up.set(0,1,0);const b=bbox();if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=Math.max(s.x,s.y,s.z)*1.75;camera.position.set(c.x+d*.9,c.y+d*.65,c.z-d*1.05);controls.target.copy(c);camera.near=Math.max(.1,d/1000);camera.far=d*15;camera.updateProjectionMatrix();controls.update()}
 function view(v){if(!controls||!modelRoot)return;const b=bbox(),c=b.getCenter(new THREE.Vector3()),size=b.getSize(new THREE.Vector3()),d=Math.max(size.x,size.y,size.z)*2;const directions={top:[0,1,0],bottom:[0,-1,0],front:[0,0,-1],back:[0,0,1],right:[1,0,0],left:[-1,0,0]};if(!directions[v])return;camera.up.set(0,1,0);if(v==='top')camera.up.set(0,0,1);if(v==='bottom')camera.up.set(0,0,-1);camera.position.copy(c).add(new THREE.Vector3(...directions[v]).multiplyScalar(d));controls.target.copy(c);camera.lookAt(c);controls.update();updateNavigationCube()}
@@ -209,10 +259,10 @@ function updateNavigationCube(){
  const ax=(p[1].x-p[0].x)/60,ay=(p[1].y-p[0].y)/60,bx=(p[3].x-p[0].x)/60,by=(p[3].y-p[0].y)/60;
  return '<g data-view="'+f.id+'" role="button" tabindex="0" aria-label="'+f.label+'" aria-pressed="'+selected+'" class="'+(selected?'selected':'')+'" style="--face-fill:'+f.fill+'"><polygon class="cube-plane" points="'+p.map(v=>v.x+','+v.y).join(' ')+'"/><text transform="matrix('+[ax,ay,bx,by,p[0].x,p[0].y].join(' ')+')" x="30" y="32" text-anchor="middle">'+f.label+'</text></g>'}).join('');
 }
-function pick(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(pointer,camera);if(hiddenPanels)return;const hits=raycaster.intersectObjects(proxyRoot.children,false);if(hits.length){const p=hits[0].object;showSpec(specByCode.get(p.userData.code),p.userData.name);highlight([p])}}
-function showSpec(s,label){if(!s)return;selectedSpec=s;ui.sheetCode.textContent=s.code;ui.sheetName.textContent=label||s.name;ui.sheetStats.innerHTML=[['Размер',`${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм`],['Количество',`${s.qty} шт.`],['Материал',s.material||'—'],['Отверстия',`${s.holes||0}`]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join('');ui.sheet.classList.remove('hidden')}
+function pick(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(pointer,camera);if(hiddenPanels)return;const hits=raycaster.intersectObjects(proxyRoot.children.filter(p=>!hiddenPartIds.has(p.uuid)),false);if(hits.length){const p=hits[0].object;showSpec(specByCode.get(p.userData.code),p.userData.name);highlight([p])}}
+function showSpec(s,label){if(!s)return;selectedProxies=[];selectedSpec=s;ui.sheetCode.textContent=s.code;ui.sheetName.textContent=label||s.name;ui.sheetStats.innerHTML=[['Размер',`${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм`],['Количество',`${s.qty} шт.`],['Материал',s.material||'—'],['Отверстия',`${s.holes||0}`]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join('');ui.sheet.classList.remove('hidden')}
 function renderParts(){$('#projectSummary').textContent=`${specs.length} позиций · ${specs.reduce((n,s)=>n+s.qty,0)} панелей · ${specs.reduce((n,s)=>n+s.holes*s.qty,0)} отверстий. Выберите деталь: зелёное выделение, остальные — контуры. Размеры в мм.`;const q=(ui.partSearch.value||'').toLowerCase();ui.partList.innerHTML='';specs.filter(s=>(s.code+' '+s.name+' '+s.material).toLowerCase().includes(q)).forEach(s=>{const b=document.createElement('button');b.type='button';b.className='part-row';b.innerHTML=`<span class="part-code">${esc(s.code)}</span><span><b>${esc(s.name)}</b><span>${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм · ${s.qty} шт.</span></span>`;b.addEventListener('click',()=>{showSpec(s);ui.parts.classList.add('hidden');focusCode(s.code)});ui.partList.appendChild(b)})}
-function focusCode(code){const ps=proxyByCode.get(code);if(!ps||!ps.length)return;const b=new THREE.Box3();ps.forEach(p=>b.expandByObject(p));const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=Math.max(s.x,s.y,s.z,30)*1.8;camera.position.set(c.x+d*.8,c.y+d*.65,c.z+d);controls.target.copy(c);controls.update();highlight(ps)}
+function focusCode(code){const ps=(proxyByCode.get(code)||[]).filter(p=>!hiddenPartIds.has(p.uuid));if(!ps.length){ui.status.textContent='Деталь скрыта · нажмите «Показать скрытые детали» в меню';return;}const b=new THREE.Box3();ps.forEach(p=>b.expandByObject(p));const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=Math.max(s.x,s.y,s.z,30)*1.8;camera.position.set(c.x+d*.8,c.y+d*.65,c.z+d);controls.target.copy(c);controls.update();highlight(ps)}
 function selectionGeometryForProxy(p){
  const box=new THREE.Box3().setFromObject(p).expandByScalar(2.2),positions=[];
  modelRoot.updateMatrixWorld(true);
@@ -231,6 +281,7 @@ function selectionGeometryForProxy(p){
  return g;
 }
 function highlight(ps){
+ selectedProxies=ps.filter(p=>!hiddenPartIds.has(p.uuid));ps=selectedProxies;
  selectionPulseStart=performance.now();
  clearGroup(outlineRoot);
  let any=false;
@@ -249,11 +300,11 @@ function highlight(ps){
  });
  applyVisibility();
 }
-function resetSelection(){selectedSpec=null;clearGroup(outlineRoot);applyVisibility();ui.sheet.classList.add('hidden');fit()}
+function resetSelection(){selectedProxies=[];selectedSpec=null;clearGroup(outlineRoot);applyVisibility();ui.sheet.classList.add('hidden');fit()}
 async function loadFiles(){if(!pendingFiles.length)return;const obj=pendingFiles.find(f=>/\.obj$/i.test(f.name)),xml=pendingFiles.find(f=>/\.xml$/i.test(f.name));if(!obj){err('Выберите OBJ-файл');return}ui.loading.classList.remove('hidden');try{resetScene();if(xml)parseXML(await xml.text());parseOBJ(await obj.text());if(obj.name==='01.obj'&&specByCode.size)createProxiesAndHoles();applyVisibility();fit();ui.files.classList.add('hidden');ui.status.textContent='OBJ загружен · точная геометрия';}catch(e){err('Ошибка загрузки: '+e.message)}finally{ui.loading.classList.add('hidden')}}
 function fmt(n){return Number.isFinite(+n)?(+n).toLocaleString('ru-RU',{maximumFractionDigits:2}):'—'}function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('#btnParts').addEventListener('click',()=>ui.parts.classList.toggle('hidden'));$('#closeParts').addEventListener('click',()=>ui.parts.classList.add('hidden'));ui.partSearch.addEventListener('input',renderParts);$('#btnFit').addEventListener('click',fit);$('#btnHome').addEventListener('click',resetSelection);
-$('#btnPanels').addEventListener('click',()=>{hiddenPanels=!hiddenPanels;applyVisibility();ui.status.textContent=hiddenPanels?'Панели скрыты · фурнитура и отверстия управляются отдельно':'Панели показаны'});$('#btnHardware').addEventListener('click',()=>{hiddenHardware=!hiddenHardware;applyVisibility();ui.status.textContent=hiddenHardware?'Фурнитура скрыта · отверстия сохранены':'Фурнитура показана'});$('#btnHoles').addEventListener('click',()=>{holesVisible=!holesVisible;applyVisibility()});$('#btnExplode').addEventListener('click',()=>{ui.status.textContent='Exploded view появится после экспорта scene.json из БАЗИС';setTimeout(()=>ui.status.textContent='Шкаф под вытяжку · точная OBJ-модель',2200)});
+$('#btnRestoreParts').addEventListener('click',restoreHiddenParts);$('#btnPanels').addEventListener('click',hideSelectedPart);$('#btnHardware').addEventListener('click',()=>{hiddenHardware=!hiddenHardware;applyVisibility();ui.status.textContent=hiddenHardware?'Фурнитура скрыта · отверстия сохранены':'Фурнитура показана'});$('#btnHoles').addEventListener('click',()=>{holesVisible=!holesVisible;applyVisibility()});$('#btnExplode').addEventListener('click',()=>{ui.status.textContent='Exploded view появится после экспорта scene.json из БАЗИС';setTimeout(()=>ui.status.textContent='Шкаф под вытяжку · точная OBJ-модель',2200)});
 $('#btnFiles').addEventListener('click',()=>ui.files.classList.remove('hidden'));$('#closeFiles').addEventListener('click',()=>ui.files.classList.add('hidden'));$('#btnHelp').addEventListener('click',()=>ui.help.classList.remove('hidden'));$('#closeHelp').addEventListener('click',()=>ui.help.classList.add('hidden'));$('#closeSheet').addEventListener('click',()=>ui.sheet.classList.add('hidden'));$('#btnResetSelection').addEventListener('click',resetSelection);$('#btnFocusPart').addEventListener('click',()=>selectedSpec&&focusCode(selectedSpec.code));
 ui.fileInput.addEventListener('change',e=>{pendingFiles=[...e.target.files];ui.fileState.textContent=pendingFiles.map(f=>f.name).join(' · ');ui.process.disabled=!pendingFiles.length});ui.process.addEventListener('click',loadFiles);$('#navigationCube').addEventListener('click',e=>{const face=e.target.closest('[data-view]');if(face)view(face.dataset.view)});$('#navigationCube').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const face=e.target.closest('[data-view]');if(face){e.preventDefault();view(face.dataset.view)}}});$('#navigationCube').addEventListener('pointerover',e=>{const face=e.target.closest('[data-view]');$('#cubeHint').textContent=face?face.getAttribute('aria-label'):'Виды'});$('#navigationCube').addEventListener('pointerleave',()=>$('#cubeHint').textContent='Виды');
 $('#btnMenu').addEventListener('click',()=>$('#viewerMenu').classList.toggle('hidden'));$('#viewerMenu').addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;const ids={fit:'btnFit',parts:'btnParts',panels:'btnPanels',hardware:'btnHardware',holes:'btnHoles',help:'btnHelp'};if(ids[button.dataset.action])$('#'+ids[button.dataset.action]).click();$('#viewerMenu').classList.add('hidden')});document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-label',b.title||b.textContent.trim()));
