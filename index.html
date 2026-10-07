@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.7.2</title>
+  <title>GEOSLUX 3D Production Viewer v0.7.3</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -69,7 +69,7 @@
 <button id="btnMenu" class="tool" title="Меню"><small>Меню</small></button>
 </div></header>
 
-    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7.2</small></strong>
+    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7.3</small></strong>
 <button id="btnFit" title="Вписать модель"><span>В центр модели</span></button>
 <button data-action="parts"><span>Список деталей</span></button>
 <button id="btnSpecification"><span>Спецификация<small>Размеры, материалы, кромки · печать и CSV</small></span></button>
@@ -94,7 +94,7 @@
 
       <div class="view-cube" aria-label="Стандартные виды"><svg id="navigationCube" viewBox="0 0 140 150" aria-label="Куб навигации"></svg><span id="cubeHint" class="cube-hint">Виды</span></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7.2</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7.3</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -391,7 +391,28 @@ function resetSelection(){selectedSpec=null;selectedProxies=[];isolatedPart=null
 function hideSelectedPart(){if(!selectedProxies.length){ui.status.textContent='Сначала выберите деталь';return}selectedProxies.forEach(p=>hiddenPartIds.add(p.uuid));resetSelection();ui.status.textContent='Выбранная деталь скрыта';}
 function restoreHiddenParts(){hiddenPartIds.clear();isolatedPart=null;applyVisibility();ui.status.textContent='Все скрытые детали показаны'}
 function updateSelectionPulse(now){if(selectionMotion.matches)return;const t=(1-Math.cos((now-selectionPulseStart)*Math.PI*2/2400))/2;selectedProxies.filter(p=>p.visible).forEach(p=>p.material.forEach(m=>m.color.copy(selectionGreen).lerp(selectionLight,t)))}
-function pick(e){if(!renderer||gestureMoved||activePointers.size>1)return;const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObjects(parts.filter(p=>p.visible),false)[0];if(!hit)return;if(measuring){measurePick(hit);return}showPart(hit.object)}
+let lastPartPick=null;
+function pick(e){
+ if(!renderer||gestureMoved||activePointers.size>1)return;
+ const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);raycaster.setFromCamera(pointer,camera);
+ const seen=new Set(),hits=raycaster.intersectObjects(parts.filter(p=>p.visible),false).filter(h=>{if(seen.has(h.object.uuid))return false;seen.add(h.object.uuid);return true});
+ if(!hits.length){lastPartPick=null;return}
+ if(measuring){measurePick(hits[0]);return}
+ const signature=hits.map(h=>h.object.uuid).join('|')+'|'+camera.position.toArray().concat(camera.quaternion.toArray()).map(v=>v.toFixed(4)).join(',');
+ const repeated=lastPartPick&&lastPartPick.signature===signature&&Math.hypot(e.clientX-lastPartPick.x,e.clientY-lastPartPick.y)<8;
+ let hit;
+ if(repeated){const index=hits.findIndex(h=>h.object===selectedProxies[0]);hit=hits[(index+1)%hits.length]}
+ else{
+  // In transparent context, prefer the element whose visible contour was tapped.
+  const outlines=parts.filter(p=>p.visible).flatMap(p=>p.children.filter(o=>o.userData.outline&&o.visible));
+  const distance=camera.position.distanceTo(controls.target);
+  raycaster.params.Line.threshold=distance*2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*6/r.height;
+  const edgeHit=selectedProxies.length&&!clientView?raycaster.intersectObjects(outlines,false)[0]:null;
+  hit=edgeHit?{object:edgeHit.object.parent}:hits[0];
+ }
+ lastPartPick={x:e.clientX,y:e.clientY,signature};showPart(hit.object);
+ if(hits.length>1)ui.status.textContent='Выбрана одна деталь · повторное нажатие здесь выбирает следующую за ней';
+}
 function bindGestures(){const el=renderer.domElement;el.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);gestureOrigin={x:e.clientX,y:e.clientY};gestureMoved=activePointers.size>1});el.addEventListener('pointermove',e=>{if(activePointers.has(e.pointerId)&&Math.hypot(e.clientX-gestureOrigin.x,e.clientY-gestureOrigin.y)>7)gestureMoved=true});el.addEventListener('pointerup',e=>activePointers.delete(e.pointerId));el.addEventListener('pointercancel',e=>{activePointers.delete(e.pointerId);gestureMoved=true})}
 function setExplode(value){explodeAmount=Number(value);const center=sceneBounds?.getCenter(new THREE.Vector3());if(!center)return;const spread=sceneBounds.getSize(new THREE.Vector3()).length()*.35;parts.forEach((p,i)=>{let dir=p.userData.basePosition.clone().sub(center).normalize();if(dir.lengthSq()<.01)dir.set(0,1,0);p.position.copy(p.userData.basePosition).addScaledVector(dir,spread*explodeAmount)});const panel=parts.find(p=>p.userData.code==='005');if(panel&&holeRoot)holeRoot.position.copy(panel.position).sub(panel.userData.basePosition);$('#explodeValue').textContent=Math.round(explodeAmount*100)+'%';$('#btnExplode').classList.toggle('active',explodeAmount>0);clearMeasurement()}
 function buildNumberLabels(){$('#partNumbers').innerHTML='';parts.forEach(p=>{const b=document.createElement('button');b.textContent=p.userData.code;b.title=p.userData.name;b.addEventListener('click',()=>showPart(p));$('#partNumbers').appendChild(b);p.userData.numberLabel=b})}
