@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.7.1</title>
+  <title>GEOSLUX 3D Production Viewer v0.7.2</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -69,7 +69,7 @@
 <button id="btnMenu" class="tool" title="Меню"><small>Меню</small></button>
 </div></header>
 
-    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7.1</small></strong>
+    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7.2</small></strong>
 <button id="btnFit" title="Вписать модель"><span>В центр модели</span></button>
 <button data-action="parts"><span>Список деталей</span></button>
 <button id="btnSpecification"><span>Спецификация<small>Размеры, материалы, кромки · печать и CSV</small></span></button>
@@ -94,7 +94,7 @@
 
       <div class="view-cube" aria-label="Стандартные виды"><svg id="navigationCube" viewBox="0 0 140 150" aria-label="Куб навигации"></svg><span id="cubeHint" class="cube-hint">Виды</span></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7.1</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7.2</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -278,11 +278,13 @@ function updateNavigationCube(){
  if(!camera||!window.THREE)return;
  const inverse=camera.quaternion.clone().invert(),key=inverse.toArray().map(n=>n.toFixed(5)).join(',');
  if(key===cubeRotationKey)return;cubeRotationKey=key;
- const project=p=>{const v=new THREE.Vector3(...p).applyQuaternion(inverse);return {x:70+v.x*33,y:68-v.y*33,z:v.z}};
- const faces=cubeFaces.map(f=>({...f,n:new THREE.Vector3(...f.normal).applyQuaternion(inverse),p:f.points.map(project)})).filter(f=>f.n.z>.001).sort((a,b)=>a.n.z-b.n.z);
+ const cubeDistance=5, cubeFocal=150;
+ const project=p=>{const v=new THREE.Vector3(...p).applyQuaternion(inverse),scale=cubeFocal/(cubeDistance-v.z);return {x:70+v.x*scale,y:68-v.y*scale,z:v.z}};
+ const faces=cubeFaces.map(f=>({...f,n:new THREE.Vector3(...f.normal).applyQuaternion(inverse),p:f.points.map(project)})).filter(f=>f.n.z>1/cubeDistance+.001).sort((a,b)=>a.n.z-b.n.z);
  $('#navigationCube').innerHTML=faces.map(f=>{const p=f.p,selected=f.n.z>.9995;
- const ax=(p[1].x-p[0].x)/60,ay=(p[1].y-p[0].y)/60,bx=(p[3].x-p[0].x)/60,by=(p[3].y-p[0].y)/60;
- return '<g data-view="'+f.id+'" role="button" tabindex="0" aria-label="'+f.label+'" aria-pressed="'+selected+'" class="'+(selected?'selected':'')+'" style="--face-fill:'+f.fill+'"><polygon class="cube-plane" points="'+p.map(v=>v.x+','+v.y).join(' ')+'"/><text transform="matrix('+[ax,ay,bx,by,p[0].x,p[0].y].join(' ')+')" x="30" y="32" text-anchor="middle">'+f.label+'</text></g>'}).join('');
+ const center=f.normal, mid=(a,b)=>a.map((v,i)=>(v+b[i])/2),left=project(mid(f.points[0],f.points[3])),right=project(mid(f.points[1],f.points[2])),top=project(mid(f.points[0],f.points[1])),bottom=project(mid(f.points[3],f.points[2])),label=project(center);
+ const ax=(right.x-left.x)/60,ay=(right.y-left.y)/60,bx=(bottom.x-top.x)/60,by=(bottom.y-top.y)/60;
+ return '<g data-view="'+f.id+'" role="button" tabindex="0" aria-label="'+f.label+'" aria-pressed="'+selected+'" class="'+(selected?'selected':'')+'" style="--face-fill:'+f.fill+'"><polygon class="cube-plane" points="'+p.map(v=>v.x+','+v.y).join(' ')+'"/><text transform="matrix('+[ax,ay,bx,by,label.x,label.y].join(' ')+')" x="0" y="2" text-anchor="middle">'+f.label+'</text></g>'}).join('');
 }
 function pick(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(pointer,camera);if(hiddenPanels)return;const hits=raycaster.intersectObjects(proxyRoot.children.filter(p=>!hiddenPartIds.has(p.uuid)),false);if(hits.length){const p=hits[0].object;showSpec(specByCode.get(p.userData.code),p.userData.name);highlight([p])}}
 function showSpec(s,label){if(!s)return;selectedProxies=[];selectedSpec=s;ui.sheetCode.textContent=s.code;ui.sheetName.textContent=label||s.name;ui.sheetStats.innerHTML=[['Размер',`${fmt(s.length)} × ${fmt(s.width)} × ${fmt(s.thickness)} мм`],['Количество',`${s.qty} шт.`],['Материал',s.material||'—'],['Отверстия',`${s.holes||0}`]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join('');ui.sheet.classList.remove('hidden')}
