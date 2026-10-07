@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#eef4f7">
-  <title>GEOSLUX 3D Production Viewer v0.7</title>
+  <title>GEOSLUX 3D Production Viewer v0.7.1</title>
   <style>
 :root{--bg:#eaf1f5;--glass:rgba(255,255,255,.86);--text:#20252a;--muted:#66727c;--line:rgba(26,39,48,.13);--accent:#159957}
 *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{overflow:hidden}button,input{font:inherit}button{touch-action:manipulation}
@@ -69,7 +69,7 @@
 <button id="btnMenu" class="tool" title="Меню"><small>Меню</small></button>
 </div></header>
 
-    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7</small></strong>
+    <nav id="viewerMenu" class="viewer-menu hidden" aria-label="Меню просмотра"><strong>GEOSLUX Viewer <small>v0.7.1</small></strong>
 <button id="btnFit" title="Вписать модель"><span>В центр модели</span></button>
 <button data-action="parts"><span>Список деталей</span></button>
 <button id="btnSpecification"><span>Спецификация<small>Размеры, материалы, кромки · печать и CSV</small></span></button>
@@ -94,7 +94,7 @@
 
       <div class="view-cube" aria-label="Стандартные виды"><svg id="navigationCube" viewBox="0 0 140 150" aria-label="Куб навигации"></svg><span id="cubeHint" class="cube-hint">Виды</span></div>
 
-      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7</div>
+      <div id="statusPill" class="status-pill">Шкаф под вытяжку · OBJ + XML · v0.7.1</div>
       <button id="btnHelp" class="help" type="button">?</button>
     </main>
 
@@ -198,7 +198,7 @@ function colorFor(name){const l=(name||'').toLowerCase();if(l.includes('u999')||
 function remakeMaterial(src){const name=(src&&src.name)||'Материал';const metal=/сталь|планка/i.test(name);const m=new THREE.MeshStandardMaterial({name,color:colorFor(name),roughness:metal?.38:.64,metalness:metal?.55:.04,side:THREE.DoubleSide});m.userData={hardware:hardwareRE.test(name),sourceName:name};materialRegistry.push(m);return m}
 function parseOBJ(t){const g=new THREE.OBJLoader().parse(t);g.name='Шкаф под вытяжку';g.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;o.material=Array.isArray(o.material)?o.material.map(remakeMaterial):remakeMaterial(o.material);if(!o.geometry.attributes.normal)o.geometry.computeVertexNormals()});modelRoot.add(g);g.updateMatrixWorld(true);
 g.traverse(o=>{if(!o.isMesh)return;const geo=o.geometry,index=geo.index,pos=geo.attributes.position,mats=Array.isArray(o.material)?o.material:[o.material],groups=geo.groups.length?geo.groups:[{start:0,count:index?index.count:pos.count,materialIndex:0}];
-groups.forEach(group=>{const vertices=[];for(let i=group.start;i<group.start+group.count;i++){const v=new THREE.Vector3().fromBufferAttribute(pos,index?index.getX(i):i).applyMatrix4(o.matrixWorld);vertices.push(v.x,v.y,v.z)}const part=new THREE.BufferGeometry();part.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));const edge=new THREE.LineSegments(new THREE.EdgesGeometry(part,40),new THREE.LineBasicMaterial({color:0x536c60,transparent:true,opacity:.34}));edge.userData.hardware=!!mats[group.materialIndex]?.userData.hardware;contextRoot.add(edge);part.dispose()})});updateShadow();return g}
+groups.forEach(group=>{const vertices=[];for(let i=group.start;i<group.start+group.count;i++){const v=new THREE.Vector3().fromBufferAttribute(pos,index?index.getX(i):i).applyMatrix4(o.matrixWorld);vertices.push(v.x,v.y,v.z)}const part=new THREE.BufferGeometry();part.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));const edge=new THREE.LineSegments(new THREE.EdgesGeometry(part,40),new THREE.LineBasicMaterial({color:0x263f32,transparent:true,opacity:.6}));edge.userData.hardware=!!mats[group.materialIndex]?.userData.hardware;contextRoot.add(edge);part.dispose()})});updateShadow();return g}
 function updateShadow(){const b=bbox(),size=b.getSize(new THREE.Vector3()),center=b.getCenter(new THREE.Vector3());if(!shadowPlane){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d'),gradient=ctx.createRadialGradient(64,64,5,64,64,64);gradient.addColorStop(0,'rgba(30,48,38,.24)');gradient.addColorStop(.45,'rgba(30,48,38,.13)');gradient.addColorStop(1,'rgba(30,48,38,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,128,128);shadowPlane=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false,side:THREE.DoubleSide}));shadowPlane.rotation.x=-Math.PI/2;scene.add(shadowPlane)}shadowPlane.position.set(center.x,b.min.y-4,center.z);shadowPlane.scale.set(Math.max(size.x*1.6,100),Math.max(size.z*2,100),1)}
 function mergeGeometryForEdges(g){const positions=[];g.updateMatrixWorld(true);g.traverse(o=>{if(!o.isMesh||!o.geometry.attributes.position)return;const a=o.geometry.attributes.position;for(let i=0;i<a.count;i++){const v=new THREE.Vector3().fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld);positions.push(v.x,v.y,v.z)}});const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));return geo}
 function createProxiesAndHoles(){// Current BAZIS model: exact OBJ coordinates, matched to XML dimensions.
@@ -245,7 +245,7 @@ function rebuildPartVisibility(){
    if(!group.count)return;const vertices=[];
    for(let i=group.start;i<group.start+group.count;i++){const v=new THREE.Vector3().fromBufferAttribute(pos,index.getX(i)).applyMatrix4(o.matrixWorld);vertices.push(v.x,v.y,v.z)}
    const part=new THREE.BufferGeometry();part.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
-   const edge=new THREE.LineSegments(new THREE.EdgesGeometry(part,40),new THREE.LineBasicMaterial({color:0x536c60,transparent:true,opacity:.34}));
+   const edge=new THREE.LineSegments(new THREE.EdgesGeometry(part,40),new THREE.LineBasicMaterial({color:0x263f32,transparent:true,opacity:.6}));
    edge.userData.hardware=!!mats[group.materialIndex]?.userData.hardware;contextRoot.add(edge);part.dispose();
   });
  });
@@ -363,14 +363,14 @@ function buildSelectableParts(known){
  const mesh=new THREE.Mesh(geo,materials);mesh.position.copy(center);mesh.castShadow=true;mesh.receiveShadow=true;
  const code=bucket.panel?.code||'G'+String(i+1).padStart(3,'0');const spec=specByCode.get(code);const size=geo.boundingBox.getSize(new THREE.Vector3());
  mesh.userData={code,name:bucket.panel?.name||((bucket.hardware?'Фурнитура':'Элемент')+' '+(i+1)),hardware:bucket.hardware,basePosition:center.clone(),spec:spec||null,dimensions:size,number:i+1};
- const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo,40),new THREE.LineBasicMaterial({color:0x536c60,transparent:true,opacity:.48}));edges.userData.outline=true;mesh.add(edges);parts.push(mesh);modelRoot.add(mesh);
+ const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo,40),new THREE.LineBasicMaterial({color:0x263f32,transparent:true,opacity:.85}));edges.userData.outline=true;mesh.add(edges);parts.push(mesh);modelRoot.add(mesh);
  });sceneBounds=new THREE.Box3().setFromObject(modelRoot);buildNumberLabels();renderParts();applyVisibility();
 }
 function partAvailable(p){return !hiddenPartIds.has(p.uuid)&&!(hiddenHardware&&p.userData.hardware)&&(!isolatedPart||isolatedPart===p.uuid)}
 function applyVisibility(){
  if(!parts.length){updatePartButtons();return}
  const chosen=new Set(selectedProxies.map(p=>p.uuid));
- parts.forEach(p=>{p.visible=partAvailable(p);const active=chosen.has(p.uuid);p.material.forEach(m=>{m.visible=true;m.wireframe=false;m.color.copy(active?selectionGreen:m.userData.baseColor);m.transparent=!!(selectedProxies.length&&!active&&!clientView)||wireOnly;m.opacity=(selectedProxies.length&&!active&&!clientView)||wireOnly?0:1;m.depthWrite=!m.transparent});p.children.forEach(e=>{if(e.userData.outline){e.visible=!clientView||active;e.material.color.setHex(active?0x087532:0x536c60);e.material.opacity=active?.95:selectedProxies.length?.27:.48}})});
+ parts.forEach(p=>{p.visible=partAvailable(p);const active=chosen.has(p.uuid);p.material.forEach(m=>{m.visible=true;m.wireframe=false;m.color.copy(active?selectionGreen:m.userData.baseColor);m.transparent=!!(selectedProxies.length&&!active&&!clientView)||wireOnly;m.opacity=(selectedProxies.length&&!active&&!clientView)||wireOnly?0:1;m.depthWrite=!m.transparent});p.children.forEach(e=>{if(e.userData.outline){e.visible=!clientView||active;e.material.color.setHex(active?0x087532:0x263f32);e.material.opacity=active?1:selectedProxies.length?.65:.85}})});
  if(holeRoot)holeRoot.visible=holesVisible;if(outlineRoot)clearGroup(outlineRoot);updatePartButtons();
 }
 function updatePartButtons(){
